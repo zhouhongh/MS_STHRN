@@ -5,6 +5,7 @@ import numpy as np
 import scipy.io as sio
 import copy
 import utils
+import os
 
 
 class FormatDataPre(object):
@@ -241,19 +242,168 @@ class HumanPredictionDataset(object):
 
 
 class AMASSDataset(Dataset):
-    def __init__(self, config, train=True):
-        pass
-    def __len__(self):
-        pass
-    def __getitem__(self, idx):
-        pass
+    """
+     the directory structure of this dataset:
+     train/
+        -action/
+            -subject/
+     test/
+        -action/
+            -subject/
+    """
 
-class AMASSPredictionDataset(Dataset):
     def __init__(self, config, train=True):
-        pass
+
+        self.config = config
+        self.train = train
+        self.formatdata = FormatData(config)
+        if train:
+            subjects = os.listdir('{0}/{1}/{2}'.format(config.data_root, 'train', config.filename))
+        else:
+            subjects = os.listdir('{0}/{1}/{2}'.format(config.data_root, 'test', config.filename))
+
+        set = []
+        complete_train = []
+        for sub in subjects:
+            if train:
+                folderdir = '{0}/{1}/{2}/{3}'.format(config.data_root, 'train', config.filename, sub)
+            else:
+                folderdir = '{0}/{1}/{2}/{3}'.format(config.data_root, 'test', config.filename, sub)
+            for file in os.listdir(folderdir):
+                filedir = '{0}/{1}'.format(folderdir, file)
+                rawdata = np.load(filedir)['poses'][:, :66]
+                rawdata = self.frame_filter(rawdata)
+                # 去除帧太少的序列
+                if rawdata.shape[0] > 150:
+                    set.append(rawdata)
+            if len(complete_train) == 0:
+                complete_train = copy.deepcopy(set[-1]) #每个subjects取最后一个动作序列计算均值方差
+            else:
+                complete_train = np.append(complete_train, set[-1], axis=0)
+        if train:
+            print('video num for training：', len(set))
+        else:
+            print('video num for test：', len(set))
+        if not train and config.data_mean is None:
+            print('Load train dataset first!')
+        if train:
+            data_mean, data_std, dim_to_ignore, dim_to_use = utils.normalization_stats(complete_train)
+            config.data_mean = data_mean
+            config.data_std = data_std
+            config.dim_to_ignore = dim_to_ignore
+            config.dim_to_use = dim_to_use
+
+        set = utils.normalize_data(set, config.data_mean, config.data_std, config.dim_to_use)
+        # [S_num, frame_for_S, 60]
+        self.data = set
     def __len__(self):
-        pass
+
+        return len(self.data)
+
     def __getitem__(self, idx):
-        pass
+
+        sample = self.formatdata(self.data[idx], False)
+        return sample
+    def frame_filter(self, rawdata):
+        '''
+        author: zhouhonghong
+        过滤掉前后的静止画面
+        :return:
+        '''
+        forward_frame = rawdata[0, :]
+        remain_id = []
+        for id in range(rawdata.shape[0] - 1):
+            this_frame = rawdata[id + 1, :]
+            if np.sum(np.abs(this_frame - forward_frame)) > 0.1: # 变化阈值，小于0.1视为静止
+                remain_id.append(id + 1)
+            forward_frame = this_frame
+        start_id = remain_id[0]
+        end_id = remain_id[-1]
+        if abs(start_id-end_id) > 30:
+            return rawdata[start_id:end_id-30, :]
+        else:
+            return rawdata[start_id, :]
+
+
+
+
+class AMASSPredictionDataset(object):
+
+    def __init__(self, config):
+        self.config = config
+        self.action = config.filename
+        test_set = {}
+        self.file_names = [[],] # 列表，顺序记录各subject文件夹下的数据文件名称
+        subs = os.listdir('{0}/{1}/{2}'.format(config.data_root, 'test', self.action))
+        for sub in subs:
+            folderdir = '{0}/{1}/{2}/{3}'.format(config.data_root, 'test', self.action, sub)
+            for filename in os.listdir(folderdir):
+                filedir = '{0}/{1}'.format(folderdir, filename)
+                test_set[(sub, filename)] = np.load(filedir)['poses'][:, :66]
+
+        try:
+            config.data_mean
+        except NameError:
+            print('Load  train set first!')
+
+        self.test_set = utils.normalize_data_dir(test_set, config.data_mean, config.data_std, config.dim_to_use)
+
     def get_data(self):
-        pass
+        x_test = {}
+        y_test = {}
+        dec_in_test = {}
+        encoder_inputs, decoder_inputs, decoder_outputs = self.get_batch_srnn(self.config, self.test_set,
+                                                                                  self.config.output_window_size)
+        x_test[self.action] = encoder_inputs
+        y_test[self.action] = decoder_outputs
+        dec_in_test[self.action] = np.zeros([decoder_inputs.shape[0], 1, decoder_inputs.shape[2]])
+        dec_in_test[self.action][:, 0, :] = decoder_inputs[:, 0, :]
+        return [x_test, y_test, dec_in_test]
+
+    def get_batch_srnn(self, config, data, target_seq_len):
+        # Obtain SRNN test sequences using the specified random seeds
+
+        frames = {}
+        frames[self.action] = self.find_indices_srnn(data)
+
+        batch_size = 4 ##  不大于测试集视频数目
+        source_seq_len = config.input_window_size
+
+        seeds = [(frames[self.action][i]) for i in range(batch_size)]
+
+        encoder_inputs = np.zeros((batch_size, source_seq_len - 1, config.input_size), dtype=float)
+        decoder_inputs = np.zeros((batch_size, target_seq_len, config.input_size), dtype=float)
+        decoder_outputs = np.zeros((batch_size, target_seq_len, config.input_size), dtype=float)
+
+        for i in range(batch_size):
+            idx = seeds[i]
+            idx = idx + source_seq_len
+
+            data_sel = data[self.keys[i]]
+
+            data_sel = data_sel[(idx - source_seq_len):(idx + target_seq_len), :]
+
+            encoder_inputs[i, :, :] = data_sel[0:source_seq_len - 1, :]  # x_test
+            decoder_inputs[i, :, :] = data_sel[source_seq_len - 1:(source_seq_len + target_seq_len - 1), :]  # decoder_in_test
+            decoder_outputs[i, :, :] = data_sel[source_seq_len:, :]  # y_test
+
+        return [encoder_inputs, decoder_inputs, decoder_outputs]
+
+    def find_indices_srnn(self, data):
+
+        """
+        Obtain the same action indices as in SRNN using a fixed random seed
+        See https://github.com/asheshjain399/RNNexp/blob/master/structural_rnn/CRFProblems/H3.6m/processdata.py
+        """
+
+        SEED = 1234567890
+        rng = np.random.RandomState(SEED)
+        prefix, suffix = 50,  100#  腾出前面的输入帧和后面的预测帧
+
+        idx = []
+        self.keys = []
+        for key in data.keys():
+            idx.append(rng.randint(0, data[key].shape[0] - prefix - suffix))
+            self.keys.append(key)
+
+        return idx

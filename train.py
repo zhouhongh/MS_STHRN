@@ -1,5 +1,5 @@
 from choose_dataset import DatasetChooser
-from ST_HRN import  ST_HRN
+from ST_HRN import ST_HRN
 from HMR import HMR
 from MS_STHRN import MS_STHRN
 from torch.utils.data import DataLoader
@@ -152,7 +152,7 @@ def train(config, checkpoint_dir):
         Error_list.append(error_actions)
 
         # save log
-        np.savez('./log/' + time_now + '.npz', trainloss_list=trainloss_list, validloss_list=validloss_list,
+        np.savez('./log/' + config.model + '_' + time_now + '.npz', trainloss_list=trainloss_list, validloss_list=validloss_list,
                  Error_list=Error_list)
 
         if error_actions < best_error:
@@ -253,7 +253,7 @@ def prediction(config, checkpoint_dir, output_dir):
 if __name__ == '__main__':
 
     parser = ArgumentParser()
-    parser.add_argument("--gpu", default=[0], help="GPU device ids")
+    parser.add_argument("--gpu", default=[2], help="GPU device ids")
     parser.add_argument("--training", default=True, dest="training", help="train or test")
     parser.add_argument("--action", type=str, default='all', dest="action", help="choose one action in the dataset:"
                                                                                  "h3.6m_actions = ['directions', 'discussion', 'eating', 'greeting', 'phoning', 'posing', 'purchases', 'sitting',"

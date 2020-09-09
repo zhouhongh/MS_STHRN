@@ -20,7 +20,6 @@ import numpy as np
 
 class TrainConfig(object):
     """Training Configurations"""
-    train = True
     input_window_size = 10  # Input window size during training
     output_window_size = 50  # Output window size during training
     hidden_size = 18  # Number of hidden units for HMR
@@ -44,11 +43,15 @@ class TrainConfig(object):
     # choose loss
     loss_name = ['l2', 'weightlie', 'HMRlie']
     loss = loss_name[1]
-    """Only suitable for ST_HRN"""
+
+    """suitable for ST_HRN && MS_STHRN"""
     share_encoder_weights = True  # share encoder weight at each recurrent step, this param only applies to ST_HRN
     bone_dim = 3  # dimension of one bone representation, static in all datasets
     decoder_name = ['lstm', 'Kinematics_lstm']
     decoder = decoder_name[1]
+
+    """only suitable for MS_STHRN"""
+    data_root = '/mnt/DataDrive164/zhouhonghong/AMASS_selected'
 
     def __init__(self, dataset, datatype, action, gpu, training, visualize):
         self.device_ids = gpu  # index of GPU used to train the model
@@ -62,18 +65,18 @@ class TrainConfig(object):
         if dataset == 'Human':
             self.nbones = 18
         elif dataset == 'AMASS':
-            self.nbones == 20
+            self.nbones = 20
 
         """Define kinematic chain configurations based on dataset class."""
 
 
         if self.dataset == 'Human':
 
-            # self.spine_id = [0, 8, 9, 10, 11]
-            # self.left_arm_id = [15, 16, 17]
-            # self.right_arm_id = [12, 13, 14]
-            # self.left_leg_id = [5, 6, 7]
-            # self.right_leg_id = [1, 2, 3, 4]
+            self.spine_id = [0, 8, 9, 10, 11]
+            self.left_arm_id = [15, 16, 17]
+            self.right_arm_id = [12, 13, 14]
+            self.left_leg_id = [5, 6, 7]
+            self.right_leg_id = [1, 2, 3, 4]
 
             self.chain_config = [np.array([0, 1, 2, 3, 4, 5]),  # leg
                                  np.array([0, 6, 7, 8, 9, 10]),  # leg
@@ -138,11 +141,11 @@ class TrainConfig(object):
         elif self.dataset == 'AMASS':
 
             # AMASS
-            # self.spine_id = [0, 3, 6, 9, 10, 13]
-            # self.left_arm_id = [11, 14, 16, 18]
-            # self.right_arm_id = [12, 15, 17, 19]
-            # self.left_leg_id = [1, 4, 7]
-            # self.right_leg_id = [2, 5, 8]
+            self.spine_id = [0, 3, 6, 9, 10, 13]
+            self.left_arm_id = [11, 14, 16, 18]
+            self.right_arm_id = [12, 15, 17, 19]
+            self.left_leg_id = [1, 4, 7]
+            self.right_leg_id = [2, 5, 8]
             self.chain_config = [np.array([0, 1, 4, 7]),  # leg
                                  np.array([0, 2, 5, 8]),  # leg
                                  np.array([0, 3, 6, 9, 10, 13]),  # spine

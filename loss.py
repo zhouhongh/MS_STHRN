@@ -10,7 +10,7 @@ def loss(prediction, y, bone, config):
     if config.loss == 'l2':
         loss = l2_loss(prediction, y)
     elif config.loss == 'weightlie':
-        if config.dataset == 'Human':
+        if config.dataset == 'Human' or config.dataset == 'AMASS':
             y = utils.prepare_loss(y, config.data_mean.shape[0], config.dim_to_ignore)
             prediction = utils.prepare_loss(prediction, config.data_mean.shape[0], config.dim_to_ignore)
         loss = weightlie_loss(prediction, y, bone, config)
