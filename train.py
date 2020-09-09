@@ -253,15 +253,14 @@ def prediction(config, checkpoint_dir, output_dir):
 if __name__ == '__main__':
 
     parser = ArgumentParser()
-    parser.add_argument("--changed", dest="changed", default=True, help="choose to use zhh's model")
-    parser.add_argument("--gpu", dest="gpu", default=[0], help="GPU device ids")
+    parser.add_argument("--gpu", default=[0], help="GPU device ids")
     parser.add_argument("--training", default=True, dest="training", help="train or test")
     parser.add_argument("--action", type=str, default='all', dest="action", help="choose one action in the dataset:"
                                                                                  "h3.6m_actions = ['directions', 'discussion', 'eating', 'greeting', 'phoning', 'posing', 'purchases', 'sitting',"
                                                                                  "'sittingdown', 'smoking', 'takingphoto', 'waiting', 'walking', 'walkingdog', 'walkingtogether']"
                                                                                  "'all means all of the above")
     parser.add_argument("--dataset", type=str, required=True, dest="dataset",
-                        help="choose dataset from 'Human' or 'Mouse'")
+                        help="choose dataset from 'Human' or 'AMASS'")
     parser.add_argument("--datatype", type=str, default='lie', dest="datatype", help="only lie is usable")
     parser.add_argument("--visualize", type=bool, default=False, dest="visualize",
                         help="visualize the prediction or not ")

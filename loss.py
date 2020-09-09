@@ -1,3 +1,5 @@
+# implemented by JunfengHu
+# create time: 7/25/2019
 
 import torch
 import utils
@@ -10,7 +12,6 @@ def loss(prediction, y, bone, config):
     elif config.loss == 'weightlie':
         if config.dataset == 'Human':
             y = utils.prepare_loss(y, config.data_mean.shape[0], config.dim_to_ignore)
-            # 通过prepare_loss添加了被去除的0值节点
             prediction = utils.prepare_loss(prediction, config.data_mean.shape[0], config.dim_to_ignore)
         loss = weightlie_loss(prediction, y, bone, config)
     elif config.loss == 'HMRlie':
@@ -74,11 +75,3 @@ def weightlie_loss(prediction, y, bone, config):
     loss = torch.mean(loss)
 
     return loss
-
-
-if __name__ == '__main__':
-    import numpy as np
-    a = np.array([[1,2,3],[4,5,6],[7,8,9],[10,11,12]])
-    a_t = torch.from_numpy(a)
-    a_max = a_t.max()
-    print('ok')

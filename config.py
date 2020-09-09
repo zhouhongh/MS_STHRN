@@ -21,19 +21,10 @@ import numpy as np
 class TrainConfig(object):
     """Training Configurations"""
     train = True
-
-    data_root = '/mnt/DataDrive164/zhouhonghong/AMASS_selected/train/walking_run'
-
-    # walking_run
-    subjects_train = ['KIT_9', 'KIT_424', 'KIT_359', 'KIT_314', 'KIT_205', 'KIT_167']
-    # walking_run
-    subjects_test = ['KIT_3']
-
-    changed = True   # 是否是zhouhonghong改过的方法
-    input_window_size = 20  # Input window size during training
+    input_window_size = 10  # Input window size during training
     output_window_size = 50  # Output window size during training
     hidden_size = 18  # Number of hidden units for HMR
-    batch_size = 16  # Batch size for training
+    batch_size = 50  # Batch size for training
     learning_rate = 0.001  # Learning rate
     max_epoch = 200 #200  # Maximum training epochs 本来是500
     training_size = 100 # 200  # Training iterations per epoch
@@ -46,9 +37,11 @@ class TrainConfig(object):
     decoder_recurrent_steps = 2  # Number of recurrent steps in ST-HMR decoder expect kinematics LSTM
     visualize = False               # visualize the predicted motion during testing
 
+    # choose model
     models_name = ['HMR', 'ST_HRN', 'MS_STHRN']
     model = models_name[1]
 
+    # choose loss
     loss_name = ['l2', 'weightlie', 'HMRlie']
     loss = loss_name[1]
     """Only suitable for ST_HRN"""
@@ -76,11 +69,11 @@ class TrainConfig(object):
 
         if self.dataset == 'Human':
 
-            self.spine_id = [0, 8, 9, 10, 11]
-            self.left_arm_id = [15, 16, 17]
-            self.right_arm_id = [12, 13, 14]
-            self.left_leg_id = [5, 6, 7]
-            self.right_leg_id = [1, 2, 3, 4]
+            # self.spine_id = [0, 8, 9, 10, 11]
+            # self.left_arm_id = [15, 16, 17]
+            # self.right_arm_id = [12, 13, 14]
+            # self.left_leg_id = [5, 6, 7]
+            # self.right_leg_id = [1, 2, 3, 4]
 
             self.chain_config = [np.array([0, 1, 2, 3, 4, 5]),  # leg
                                  np.array([0, 6, 7, 8, 9, 10]),  # leg
@@ -94,7 +87,7 @@ class TrainConfig(object):
                                  np.array([16, 17, 18, 19, 20, 21, 22, 23]),  # arm
                                  np.array([24, 25, 26, 27, 28, 19, 30, 31])]  # arm
 
-            self.training_chain_length = [9, 9, 18, 12, 12]
+            self.training_chain_length = [8, 8, 18, 10, 10]
 
             # H3.6M
             self.index = [[6, 7, 8, 9, 10, 11, 12, 13],
@@ -145,11 +138,11 @@ class TrainConfig(object):
         elif self.dataset == 'AMASS':
 
             # AMASS
-            self.spine_id = [0, 3, 6, 9, 10, 13]
-            self.left_arm_id = [11, 14, 16, 18]
-            self.right_arm_id = [12, 15, 17, 19]
-            self.left_leg_id = [1, 4, 7]
-            self.right_leg_id = [2, 5, 8]
+            # self.spine_id = [0, 3, 6, 9, 10, 13]
+            # self.left_arm_id = [11, 14, 16, 18]
+            # self.right_arm_id = [12, 15, 17, 19]
+            # self.left_leg_id = [1, 4, 7]
+            # self.right_leg_id = [2, 5, 8]
             self.chain_config = [np.array([0, 1, 4, 7]),  # leg
                                  np.array([0, 2, 5, 8]),  # leg
                                  np.array([0, 3, 6, 9, 10, 13]),  # spine

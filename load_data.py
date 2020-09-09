@@ -1,27 +1,29 @@
+# implemented by JunfengHu
+# create time: 7/20/2019
 from torch.utils.data import Dataset
 import numpy as np
 import scipy.io as sio
 import copy
 import utils
-class LieTsfm(object):
+
+
+class FormatDataPre(object):
     """
-    This class is redundant and could be integrated into dataset class. However, we didn't do that due to some historical events.
+    Form prediction(test) data.
     """
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self):
+        pass
 
-    def __call__(self, sample):
-        rawdata = sample
-
-        data = rawdata[:, :-1, :3].reshape(rawdata.shape[0], -1)
-        return data
+    def __call__(self, x_test, y_test):
+        dec_in_test = x_test[-1:, :]
+        x_test = x_test[:-1, :]
+        return {'x_test': x_test, 'dec_in_test': dec_in_test, 'y_test': y_test}
 
 
 class FormatData(object):
     """
     Form train/validation data.
-    形成字典
     """
 
     def __init__(self, config):
@@ -30,7 +32,7 @@ class FormatData(object):
     def __call__(self, sample, train):
 
         total_frames = self.config.input_window_size + self.config.output_window_size
-        # CMU sample [375,60]
+
         video_frames = sample.shape[0]
         idx = np.random.randint(1, video_frames - total_frames) #在可选范围中随机挑选帧起始点
 
@@ -44,6 +46,21 @@ class FormatData(object):
             decoder_inputs = data_seq[self.config.input_window_size - 1:self.config.input_window_size, :]
         decoder_outputs = data_seq[self.config.input_window_size:, :]
         return {'encoder_inputs': encoder_inputs, 'decoder_inputs': decoder_inputs, 'decoder_outputs': decoder_outputs}
+
+
+class LieTsfm(object):
+    """
+    This class is redundant and could be integrated into dataset class. However, we didn't do that due to some historical events.
+    """
+
+    def __init__(self, config):
+        self.config = config
+
+    def __call__(self, sample):
+        rawdata = sample
+
+        data = rawdata[:, :-1, :3].reshape(rawdata.shape[0], -1)
+        return data
 
 
 class HumanDataset(Dataset):
@@ -118,7 +135,6 @@ class HumanDataset(Dataset):
         sample = self.formatdata(self.data[idx], False)
         return sample
 
-
 class HumanPredictionDataset(object):
 
     def __init__(self, config):
@@ -147,7 +163,7 @@ class HumanPredictionDataset(object):
             config.data_mean
         except NameError:
             print('Load  train set first!')
-        self.test_set = utils.normalize_data_dic(test_set, config.data_mean, config.data_std, config.dim_to_use)
+        self.test_set = utils.normalize_data_dir(test_set, config.data_mean, config.data_std, config.dim_to_use)
 
     def get_data(self):
         x_test = {}
@@ -202,13 +218,14 @@ class HumanPredictionDataset(object):
 
         SEED = 1234567890
         rng = np.random.RandomState(SEED)
+
         subject = 5
         subaction1 = 1
         subaction2 = 2
 
         T1 = data[(subject, action, subaction1)].shape[0]
         T2 = data[(subject, action, subaction2)].shape[0]
-        prefix, suffix = 50, 50
+        prefix, suffix = 50, 100
 
         idx = []
         idx.append(rng.randint(16, T1 - prefix - suffix))
