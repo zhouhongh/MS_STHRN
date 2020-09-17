@@ -252,11 +252,11 @@ def forward_kinematics_h36m(angles):
     xyz = xyz[:, [0, 2, 1]]
     return xyz
 
-def prepare_loss(data, length, dim_to_ignore):
+def prepare_loss(data, length, dim_to_ignore, dataset):
     """
     recover ignore dimension in data to calculate lie loss
     :param data: prediction data
-    :param length: length of one single human pose. 99 for h3.6m dataset
+    :param length: length of one single human pose. 99 for h3.6m dataset,66 for AMASS datasets
     :param dim_to_ignore: get from function normalization_stats
     :return: recovered data
     """
@@ -268,7 +268,10 @@ def prepare_loss(data, length, dim_to_ignore):
         dimensions_to_use.append(i)
 
     origData[:, :,dimensions_to_use] = data
-    return origData[:, :, 3:]
+    if dataset == 'Human':
+        return origData[:, :, 3:]
+    elif dataset == 'AMASS':
+        return origData
 
 def normalize_data(data, data_mean, data_std, dim_to_use):
     """

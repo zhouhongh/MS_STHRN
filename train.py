@@ -15,6 +15,7 @@ import scipy.io as sio
 from plot_animation import plot_animation
 import config
 from argparse import ArgumentParser
+# python train.py --dataset Human --action all
 
 def choose_net(config):
 
@@ -253,7 +254,7 @@ def prediction(config, checkpoint_dir, output_dir):
 if __name__ == '__main__':
 
     parser = ArgumentParser()
-    parser.add_argument("--gpu", default=[2], help="GPU device ids")
+    parser.add_argument("--gpu", default=[0], help="GPU device ids")
     parser.add_argument("--training", default=True, dest="training", help="train or test")
     parser.add_argument("--action", type=str, default='all', dest="action", help="choose one action in the dataset:"
                                                                                  "h3.6m_actions = ['directions', 'discussion', 'eating', 'greeting', 'phoning', 'posing', 'purchases', 'sitting',"

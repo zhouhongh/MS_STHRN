@@ -50,7 +50,7 @@ class ST_HRN(nn.Module):
         h = torch.matmul(encoder_inputs, self.weights_in) + self.bias_in
         # [batch, config.input_window_size-1, hidden_size]
         h = h.view([h.shape[0], h.shape[1], int(h.shape[2]/self.config.hidden_size), self.config.hidden_size])
-        # [batch, nbones, frames, hidden_state]
+        # [batch, frames, nbones, hidden_state]
         #h = F.dropout(h, self.config.keep_prob, train)
         c_h = torch.empty_like(h)
         c_h.copy_(h)
@@ -230,6 +230,7 @@ class EncoderCell(nn.Module):
         c_s_before = torch.cat((padding_s, c_h[:, :, :-1, :]), dim=2)
 
         # forget gates for h
+        # _1 = torch.matmul(p, self.Ui)
         i_n = torch.sigmoid(torch.matmul(p, self.Ui) + torch.matmul(h_t_before_after, self.Wti)
                             + torch.matmul(h_s_before, self.Wsi) + torch.matmul(g_t, self.Zti)
                             + torch.matmul(g_s, self.Zsi) + self.bi)
@@ -369,38 +370,10 @@ class Kinematics_LSTM_decoder(nn.Module):
                     = cell(input, (h[i][:, frame, :].clone(), c_h[i][:, frame, :].clone()))
                 if self.config.dataset == 'Human' or self.config.dataset == 'AMASS':
                     order = [2, 0, 1, 3, 4]
-                elif self.config.dataset == 'CSL':
-                    order = [0, 1, 2]
                 if i != 0:
                     pre[:, frame, self.config.index[order[i-1]]] = torch.matmul(h[i][:, frame + 1, :].clone(),
                                                                     self.para_list[order[i-1]*2]) + self.para_list[order[i-1]*2+1] + input_first[:, self.config.index[order[i-1]]]
-                """"""
-                # if i == 1:
-                #     pre[:, frame, self.config.index[2]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_spine) + \
-                #                    self.bias_out_spine + input_first[:, self.config.index[2]]
-                # elif i == 2:
-                #     pre[:, frame, self.config.index[0]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_leg1) + \
-                #                    self.bias_out_leg1 + input_first[:, self.config.index[0]]
-                # elif i == 3:
-                #     pre[:, frame, self.config.index[1]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_leg2) + \
-                #                    self.bias_out_leg2 + input_first[:, self.config.index[1]]
-                # elif i == 4:
-                #     pre[:, frame, self.config.index[3]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm1) + \
-                #                    self.bias_out_arm1 + input_first[:, self.config.index[3]]
-                # elif i == 5:
-                #     pre[:, frame, self.config.index[4]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm2) + \
-                #                    self.bias_out_arm2 + input_first[:, self.config.index[4]]
-                """"""
-                # if i == 1:
-                #     pre[:, frame, self.config.index[0]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_spine) + \
-                #                    self.bias_out_spine + input_first[:, self.config.index[0]]
-                # elif i == 2:
-                #     pre[:, frame, self.config.index[1]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm1) + \
-                #                    self.bias_out_arm1 + input_first[:, self.config.index[1]]
-                # elif i == 3:
-                #     pre[:, frame, self.config.index[2]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm2) + \
-                #                    self.bias_out_arm2 + input_first[:, self.config.index[2]]
-                """"""""
+
 
         return pre
 

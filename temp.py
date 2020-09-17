@@ -16,7 +16,7 @@ class MS_STHRN(nn.Module):
 
         self.config = config
         self.encoder_cell = torch.nn.ModuleList()
-        config.bone_dim = 1
+
         print('Model MS_STHRN is used!!!')
         # init encoder
         if config.share_encoder_weights is False:
@@ -90,29 +90,35 @@ class MS_STHRN(nn.Module):
         g_s = torch.mean(h, 2, keepdim=True).expand_as(h)
         c_g_s = torch.mean(c_h, 2, keepdim=True).expand_as(c_h)
 
-        g_s_spine = torch.mean(h[:, :, self.config.index[2], :], 2, keepdim = True).expand_as(h)
-        g_s_left_arm = torch.mean(h[:, :, self.config.index[4], :], 2, keepdim = True).expand_as(h)
-        g_s_right_arm = torch.mean(h[:, :, self.config.index[3], :], 2, keepdim=True).expand_as(h)
-        g_s_left_leg = torch.mean(h[:, :, self.config.index[1], :], 2, keepdim=True).expand_as(h)
-        g_s_right_leg = torch.mean(h[:, :, self.config.index[0], :], 2, keepdim=True).expand_as(h)
+        g_s_spine = torch.mean(h[:, :, self.config.spine_id, :], 2, keepdim = True).expand_as(h)
+        g_s_left_arm = torch.mean(h[:, :, self.config.left_arm_id, :], 2, keepdim = True).expand_as(h)
+        g_s_right_arm = torch.mean(h[:, :, self.config.right_arm_id, :], 2, keepdim=True).expand_as(h)
+        g_s_left_leg = torch.mean(h[:, :, self.config.left_leg_id, :], 2, keepdim=True).expand_as(h)
+        g_s_right_leg = torch.mean(h[:, :, self.config.right_leg_id, :], 2, keepdim=True).expand_as(h)
 
-        c_g_s_spine = torch.mean(c_h[:, :, self.config.index[2], :], 2, keepdim = True).expand_as(c_h)
-        c_g_s_left_arm = torch.mean(c_h[:, :, self.config.index[4], :], 2, keepdim = True).expand_as(c_h)
-        c_g_s_right_arm = torch.mean(c_h[:, :, self.config.index[3], :], 2, keepdim=True).expand_as(c_h)
-        c_g_s_left_leg = torch.mean(c_h[:, :, self.config.index[1], :], 2, keepdim=True).expand_as(c_h)
-        c_g_s_right_leg = torch.mean(c_h[:, :, self.config.index[0], :], 2, keepdim=True).expand_as(c_h)
+        c_g_s_spine = torch.mean(c_h[:, :, self.config.spine_id, :], 2, keepdim = True).expand_as(c_h)
+        c_g_s_left_arm = torch.mean(c_h[:, :, self.config.left_arm_id, :], 2, keepdim = True).expand_as(c_h)
+        c_g_s_right_arm = torch.mean(c_h[:, :, self.config.right_arm_id, :], 2, keepdim=True).expand_as(c_h)
+        c_g_s_left_leg = torch.mean(c_h[:, :, self.config.left_leg_id, :], 2, keepdim=True).expand_as(c_h)
+        c_g_s_right_leg = torch.mean(c_h[:, :, self.config.right_leg_id, :], 2, keepdim=True).expand_as(c_h)
 
 
+
+        #     def forward(self, h, c_h, p, g_t,c_g_t,g_t1, g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3, g_s, c_g_s,g_s_spine, c_g_s_spine
+        #                 ,g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm,g_s_left_leg,c_g_s_left_leg
+        #                 ,g_s_right_leg,c_g_s_right_leg,train):
+        #  return hidden_states, cell_states, global_t_state, g_t, c_g_t, g_t1, g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3,
+        #  g_s, c_g_s,g_s_spine, c_g_s_spine,g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm,
+        #  g_s_left_leg,c_g_s_left_leg,g_s_right_leg,c_g_s_right_leg
         for rec in range(self.config.encoder_recurrent_steps):
-            hidden_states, cell_states, global_t_state, g_t, c_g_t, g_t1, g_t2, g_t3, c_g_t1, c_g_t2, c_g_t3, g_s, c_g_s, \
+            hidden_states, cell_states, global_t_state, g_t, c_g_t, g_t1,g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3, g_s, c_g_s, \
             g_s_spine, c_g_s_spine, g_s_left_arm, c_g_s_left_arm, g_s_right_arm, c_g_s_right_arm, \
             g_s_left_leg, c_g_s_left_leg, g_s_right_leg, c_g_s_right_leg \
-                = self.encoder_cell[rec](h, c_h, p, g_t, c_g_t, g_t1, g_t2, g_t3, c_g_t1, c_g_t2, c_g_t3,
-                                         g_s, c_g_s, g_s_spine, c_g_s_spine, g_s_left_arm, c_g_s_left_arm,
-                                         g_s_right_arm, c_g_s_right_arm, \
-                                         g_s_left_leg, c_g_s_left_leg, g_s_right_leg, c_g_s_right_leg, train)
+                = self.encoder_cell[rec](h, c_h, p, g_t, c_g_t, g_t1, g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3,
+                                         g_s, c_g_s,g_s_spine, c_g_s_spine, g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm, \
+                                         g_s_left_leg, c_g_s_left_leg,g_s_right_leg,c_g_s_right_leg,train)
         prediction = self.decoder(hidden_states, cell_states, global_t_state, decoder_inputs)
-
+        # return prediction, hidden_states,g_s_spine,g_s_left_arm,g_s_right_arm,g_s_left_leg,g_s_right_leg
         return prediction
 
 
@@ -1004,6 +1010,11 @@ class EncoderCell(nn.Module):
                                  + torch.matmul(g_s_right_leg, self.Zsrlo) + self.bo)
 
         # 候选细胞状态
+        # c_n = torch.tanh(torch.matmul(p, self.Uc) + torch.matmul(h_t_before_after, self.Wtc)
+        #                  + torch.matmul(h_s_before, self.Wsc) + torch.matmul(g_t, self.Ztc)
+        #                  + torch.matmul(g_s, self.Zsc) + self.bc)
+
+        # 候选细胞状态
         c_n = torch.tanh(torch.matmul(p, self.Uc) + torch.matmul(h_t_before_after, self.Wtc)
                             + torch.matmul(h_s_before_after, self.Wsc) + torch.matmul(g_t, self.Ztc)
                             + torch.matmul(g_s, self.Zsc) + torch.matmul(g_t1, self.Zt1c)
@@ -1084,7 +1095,7 @@ class EncoderCell(nn.Module):
         g_s = o_gs_n * torch.tanh(c_g_s)
 
         """Update g_s_spine"""
-        g_ss_hat = torch.mean(h[:, :, self.config.index[2], :], 2, keepdim=True).expand_as(h)
+        g_ss_hat = torch.mean(h[:, :, self.config.spine_id, :], 2, keepdim=True).expand_as(h)
         f_gssf_n = torch.sigmoid(torch.matmul(g_s_spine, self.Wgssf) + torch.matmul(g_ss_hat, self.Zgssf) + self.bgssf)
         f_gssg_n = torch.sigmoid(torch.matmul(g_s_spine, self.Wgssg) + torch.matmul(g_ss_hat, self.Zgssg) + self.bgssg)
         o_gss_n = torch.sigmoid(torch.matmul(g_s_spine, self.Wgsso) + torch.matmul(g_ss_hat, self.Zgsso) + self.bgsso)
@@ -1093,8 +1104,13 @@ class EncoderCell(nn.Module):
         g_s_spine = o_gss_n * torch.tanh(c_g_s_spine)
 
         # # 结果是[batch, input_window_size-1, hidden_size]，在空间维（骨骼）求了平均
+        # g_s_spine = torch.mean(h[:, 6:10, :, :], 1, keepdim = True).expand_as(h[:, 6:10, :, :])
+        # g_s_left_arm = torch.mean(h[:, 10:14, :, :], 1, keepdim = True).expand_as(h[:, 10:14, :, :])
+        # g_s_right_arm = torch.mean(h[:, 14:, :, :], 1, keepdim=True).expand_as(h[:, 14:, :, :])
+        # g_s_left_leg = torch.mean(h[:, 3:6, :, :], 1, keepdim=True).expand_as(h[:, 3:6, :, :])
+        # g_s_right_leg = torch.mean(h[:, :3, :, :], 1, keepdim=True).expand_as(h[:, :3, :, :])
         """Update g_s_left_arm"""
-        g_sla_hat = torch.mean(h[:, :, self.config.index[4], :], 2, keepdim=True).expand_as(h)
+        g_sla_hat = torch.mean(h[:, :, self.config.left_arm_id, :], 2, keepdim=True).expand_as(h)
         f_gslaf_n = torch.sigmoid(torch.matmul(g_s_left_arm, self.Wgslaf) + torch.matmul(g_sla_hat, self.Zgslaf) + self.bgslaf)
         f_gslag_n = torch.sigmoid(torch.matmul(g_s_left_arm, self.Wgslag) + torch.matmul(g_sla_hat, self.Zgslag) + self.bgslag)
         o_gsla_n = torch.sigmoid(torch.matmul(g_s_left_arm, self.Wgslao) + torch.matmul(g_sla_hat, self.Zgslao) + self.bgslao)
@@ -1103,7 +1119,7 @@ class EncoderCell(nn.Module):
         g_s_left_arm = o_gsla_n * torch.tanh(c_g_s_left_arm)
 
         """Update g_s_right_arm"""
-        g_sra_hat = torch.mean(h[:, :, self.config.index[3], :], 2, keepdim=True).expand_as(h)
+        g_sra_hat = torch.mean(h[:, :, self.config.right_arm_id, :], 2, keepdim=True).expand_as(h)
         f_gsraf_n = torch.sigmoid(torch.matmul(g_s_right_arm, self.Wgsraf) + torch.matmul(g_sra_hat, self.Zgsraf) + self.bgsraf)
         f_gsrag_n = torch.sigmoid(torch.matmul(g_s_right_arm, self.Wgsrag) + torch.matmul(g_sra_hat, self.Zgsrag) + self.bgsrag)
         o_gsra_n = torch.sigmoid(torch.matmul(g_s_right_arm, self.Wgsrao) + torch.matmul(g_sra_hat, self.Zgsrao) + self.bgsrao)
@@ -1112,7 +1128,7 @@ class EncoderCell(nn.Module):
         g_s_right_arm = o_gsra_n * torch.tanh(c_g_s_right_arm)
 
         """Update g_s_left_leg"""
-        g_sll_hat = torch.mean(h[:, :, self.config.index[1], :], 2, keepdim=True).expand_as(h)
+        g_sll_hat = torch.mean(h[:, :, self.config.left_leg_id, :], 2, keepdim=True).expand_as(h)
         f_gsllf_n = torch.sigmoid(torch.matmul(g_s_left_leg, self.Wgsllf) + torch.matmul(g_sll_hat, self.Zgsllf) + self.bgsllf)
         f_gsllg_n = torch.sigmoid(torch.matmul(g_s_left_leg, self.Wgsllg) + torch.matmul(g_sll_hat, self.Zgsllg) + self.bgsllg)
         o_gsll_n = torch.sigmoid(torch.matmul(g_s_left_leg, self.Wgsllo) + torch.matmul(g_sll_hat, self.Zgsllo) + self.bgsllo)
@@ -1121,7 +1137,7 @@ class EncoderCell(nn.Module):
         g_s_left_leg = o_gsll_n * torch.tanh(c_g_s_left_leg)
 
         """Update g_s_right_leg"""
-        g_srl_hat = torch.mean(h[:, :, self.config.index[0], :], 2, keepdim=True).expand_as(h)
+        g_srl_hat = torch.mean(h[:, :, self.config.right_leg_id, :], 2, keepdim=True).expand_as(h)
         f_gsrlf_n = torch.sigmoid(torch.matmul(g_s_right_leg, self.Wgsrlf) + torch.matmul(g_srl_hat, self.Zgsrlf) + self.bgsrlf)
         f_gsrlg_n = torch.sigmoid(torch.matmul(g_s_right_leg, self.Wgsrlg) + torch.matmul(g_srl_hat, self.Zgsrlg) + self.bgsrlg)
         o_gsrl_n = torch.sigmoid(torch.matmul(g_s_right_leg, self.Wgsrlo) + torch.matmul(g_srl_hat, self.Zgsrlo) + self.bgsrlo)
@@ -1133,8 +1149,8 @@ class EncoderCell(nn.Module):
         hidden_states = h.view([h.shape[0], h.shape[1], -1])
         cell_states = c_h.view([c_h.shape[0], c_h.shape[1], -1])
         global_t_state = g_t[:, 1, :, :].view([g_t.shape[0], -1])
-        # global_s_state = g_s[:, :, 1, :].reshape([g_s.shape[0], -1])
         return hidden_states, cell_states, global_t_state, g_t, c_g_t, g_t1, g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3,g_s, c_g_s,g_s_spine, c_g_s_spine,g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm,g_s_left_leg,c_g_s_left_leg,g_s_right_leg,c_g_s_right_leg
+
 
 class Kinematics_LSTM_decoder(nn.Module):
 
@@ -1149,7 +1165,7 @@ class Kinematics_LSTM_decoder(nn.Module):
         self.nbones = config.nbones
         self.lstm = nn.ModuleList()
         self.para_list = torch.nn.ParameterList()
-        if config.dataset == 'Human' or config.dataset == 'AMASS':
+        if config.dataset == 'Human':
             co = 5
         for i in range(co):
             self.para_list.append(torch.nn.Parameter(torch.empty(int(config.input_size/config.bone_dim*config.hidden_size), config.training_chain_length[i]).uniform_(-0.04, 0.04)))
@@ -1162,11 +1178,13 @@ class Kinematics_LSTM_decoder(nn.Module):
         arm = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
         self.lstm.append(arm)
         self.lstm.append(arm)
-        if config.dataset == 'Human' or config.dataset == 'AMASS':
+        if config.dataset == 'Human':
             leg = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
             self.lstm.append(leg)
             self.lstm.append(leg)
             self.lstm_layer = 6
+        elif config.dataset == 'CSL':
+            self.lstm_layer = 4
 
     def forward(self, hidden_states, cell_states, global_t_state, p):
         """
@@ -1183,7 +1201,7 @@ class Kinematics_LSTM_decoder(nn.Module):
         c_h = []
         pre = torch.zeros([hidden_states.shape[0], self.seq_length_out, self.config.input_size], device=p.device)
         for i in range(self.lstm_layer):
-            h.append(torch.zeros(hidden_states.shape[0], self.seq_length_out + 1, self.config.input_size * self.config.hidden_size,
+            h.append(torch.zeros(hidden_states.shape[0], self.seq_length_out + 1, self.nbones * self.config.hidden_size,
                               device=p.device))
             c_h.append(torch.zeros_like(h[i]))
             # feed init hidden states and cell states into h and c_h
@@ -1213,12 +1231,40 @@ class Kinematics_LSTM_decoder(nn.Module):
                         input = h[i-1][:, frame + 1, :].clone()
                 h[i][:, frame + 1, :], c_h[i][:, frame + 1, :] \
                     = cell(input, (h[i][:, frame, :].clone(), c_h[i][:, frame, :].clone()))
-                if self.config.dataset == 'Human' or 'AMASS':
+                if self.config.dataset == 'Human':
                     order = [2, 0, 1, 3, 4]
-
+                elif self.config.dataset == 'CSL':
+                    order = [0, 1, 2]
                 if i != 0:
                     pre[:, frame, self.config.index[order[i-1]]] = torch.matmul(h[i][:, frame + 1, :].clone(),
                                                                     self.para_list[order[i-1]*2]) + self.para_list[order[i-1]*2+1] + input_first[:, self.config.index[order[i-1]]]
+                """"""
+                # if i == 1:
+                #     pre[:, frame, self.config.index[2]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_spine) + \
+                #                    self.bias_out_spine + input_first[:, self.config.index[2]]
+                # elif i == 2:
+                #     pre[:, frame, self.config.index[0]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_leg1) + \
+                #                    self.bias_out_leg1 + input_first[:, self.config.index[0]]
+                # elif i == 3:
+                #     pre[:, frame, self.config.index[1]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_leg2) + \
+                #                    self.bias_out_leg2 + input_first[:, self.config.index[1]]
+                # elif i == 4:
+                #     pre[:, frame, self.config.index[3]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm1) + \
+                #                    self.bias_out_arm1 + input_first[:, self.config.index[3]]
+                # elif i == 5:
+                #     pre[:, frame, self.config.index[4]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm2) + \
+                #                    self.bias_out_arm2 + input_first[:, self.config.index[4]]
+                """"""
+                # if i == 1:
+                #     pre[:, frame, self.config.index[0]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_spine) + \
+                #                    self.bias_out_spine + input_first[:, self.config.index[0]]
+                # elif i == 2:
+                #     pre[:, frame, self.config.index[1]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm1) + \
+                #                    self.bias_out_arm1 + input_first[:, self.config.index[1]]
+                # elif i == 3:
+                #     pre[:, frame, self.config.index[2]] = torch.matmul(h[i][:, frame + 1, :].clone(), self.weights_out_arm2) + \
+                #                    self.bias_out_arm2 + input_first[:, self.config.index[2]]
+                """"""""
 
         return pre
 

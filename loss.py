@@ -11,13 +11,13 @@ def loss(prediction, y, bone, config):
         loss = l2_loss(prediction, y)
     elif config.loss == 'weightlie':
         if config.dataset == 'Human' or config.dataset == 'AMASS':
-            y = utils.prepare_loss(y, config.data_mean.shape[0], config.dim_to_ignore)
-            prediction = utils.prepare_loss(prediction, config.data_mean.shape[0], config.dim_to_ignore)
+            y = utils.prepare_loss(y, config.data_mean.shape[0], config.dim_to_ignore, config.dataset)
+            prediction = utils.prepare_loss(prediction, config.data_mean.shape[0], config.dim_to_ignore, config.dataset)
         loss = weightlie_loss(prediction, y, bone, config)
     elif config.loss == 'HMRlie':
-        if config.dataset == 'Human':
-            y = utils.prepare_loss(y, config.data_mean.shape[0], config.dim_to_ignore)
-            prediction = utils.prepare_loss(prediction, config.data_mean.shape[0], config.dim_to_ignore)
+        if config.dataset == 'Human' or config.dataset == 'AMASS':
+            y = utils.prepare_loss(y, config.data_mean.shape[0], config.dim_to_ignore, config.dataset)
+            prediction = utils.prepare_loss(prediction, config.data_mean.shape[0], config.dim_to_ignore, config.dataset)
         loss = HMRlie_loss(prediction, y, bone, config)
 
     return loss

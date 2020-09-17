@@ -1,4 +1,3 @@
-
 # implemented by zhouhongh
 # create time: 9/9/2020
 
@@ -16,7 +15,7 @@ class MS_STHRN(nn.Module):
 
         self.config = config
         self.encoder_cell = torch.nn.ModuleList()
-        config.bone_dim = 1
+
         print('Model MS_STHRN is used!!!')
         # init encoder
         if config.share_encoder_weights is False:
@@ -39,8 +38,8 @@ class MS_STHRN(nn.Module):
             self.decoder = Kinematics_LSTM_decoder(config)
 
         self.weights_in = torch.nn.Parameter(torch.empty(config.input_size,
-                                      int(config.input_size/config.bone_dim*config.hidden_size)).uniform_(-0.04, 0.04)) ##[54,324]
-        self.bias_in = torch.nn.Parameter(torch.empty(int(config.input_size/config.bone_dim*config.hidden_size)).uniform_(-0.04, 0.04)) ##均匀分布中采样填充
+                                      int(config.input_size*config.hidden_size)).uniform_(-0.04, 0.04)) ##[54,324]
+        self.bias_in = torch.nn.Parameter(torch.empty(int(config.input_size*config.hidden_size)).uniform_(-0.04, 0.04)) ##均匀分布中采样填充
 
     def forward(self, encoder_inputs, decoder_inputs, train):
         """
@@ -51,25 +50,23 @@ class MS_STHRN(nn.Module):
         :return:  predictions of human motion
         """
 
-        # [batch, config.input_window_size-1, input_size/bone_dim*hidden_size]
-        h = torch.matmul(encoder_inputs, self.weights_in) + self.bias_in  ##([6,49,54],[54,324])+[324]=[6,49,324]
-        # [batch, config.input_window_size-1, hidden_size]     [6,49,18,18]
+        # [batch, config.input_window_size-1, input_size*hidden_size]
+        h = torch.matmul(encoder_inputs, self.weights_in) + self.bias_in
+        # [batch, config.input_window_size-1, input_size, hidden_size]     [6,49,54,18]
         h = h.view([h.shape[0], h.shape[1], int(h.shape[2]/self.config.hidden_size), self.config.hidden_size])
-        # [batch, frames,  nbones, hidden_state]
         #h = F.dropout(h, self.config.keep_prob, train)
         c_h = torch.empty_like(h)
         c_h.copy_(h)
         #c_h = F.dropout(c_h, self.config.keep_prob, train)
 
-        #p = torch.empty_like(h)
-        #p.copy_(h)
-        # [6,49,18,3],18段骨骼，每段骨骼三维
-        p = encoder_inputs.view([encoder_inputs.shape[0], encoder_inputs.shape[1], int(encoder_inputs.shape[2]/self.config.bone_dim), self.config.bone_dim])
+        # p = torch.empty_like(h)
+        # p.copy_(h)
+        p = encoder_inputs.unsqueeze(3)
         # init global states
-        # [batch, nbones, hidden_size], 在时间维求了平均
-        g_t = torch.mean(h, 1, keepdim=True)#.expand_as(h)
+        # [batch, input_size， hidden_size], 在时间维求了平均
+        g_t = torch.mean(h, 1, keepdim=True).expand_as(h)
         c_g_t = torch.mean(c_h, 1, keepdim=True).expand_as(c_h)
-        # test_h = h[:,:(self.config.input_window_size - 1)//3,:, :]
+
         g_t1 = torch.mean(h[:,:(self.config.input_window_size - 1)//3, :, :], 1, keepdim=True).expand_as(h)
         g_t2 = torch.mean(h[:, (self.config.input_window_size - 1)//3:2*(self.config.input_window_size - 1)//3, :, :], 1, keepdim=True).expand_as(
             h)
@@ -86,32 +83,29 @@ class MS_STHRN(nn.Module):
 
 
 
-        # [batch, input_window_size-1, hidden_size]，在空间维（骨骼）求了平均
+        # [batch, input_window_size-1, hidden_size]，在空间维求了平均
         g_s = torch.mean(h, 2, keepdim=True).expand_as(h)
         c_g_s = torch.mean(c_h, 2, keepdim=True).expand_as(c_h)
 
-        g_s_spine = torch.mean(h[:, :, self.config.index[2], :], 2, keepdim = True).expand_as(h)
-        g_s_left_arm = torch.mean(h[:, :, self.config.index[4], :], 2, keepdim = True).expand_as(h)
+        g_s_spine = torch.mean(h[:, :, self.config.index[2], :], 2, keepdim=True).expand_as(h)
+        g_s_left_arm = torch.mean(h[:, :, self.config.index[4], :], 2, keepdim=True).expand_as(h)
         g_s_right_arm = torch.mean(h[:, :, self.config.index[3], :], 2, keepdim=True).expand_as(h)
         g_s_left_leg = torch.mean(h[:, :, self.config.index[1], :], 2, keepdim=True).expand_as(h)
         g_s_right_leg = torch.mean(h[:, :, self.config.index[0], :], 2, keepdim=True).expand_as(h)
 
-        c_g_s_spine = torch.mean(c_h[:, :, self.config.index[2], :], 2, keepdim = True).expand_as(c_h)
-        c_g_s_left_arm = torch.mean(c_h[:, :, self.config.index[4], :], 2, keepdim = True).expand_as(c_h)
+        c_g_s_spine = torch.mean(c_h[:, :, self.config.index[2], :], 2, keepdim=True).expand_as(c_h)
+        c_g_s_left_arm = torch.mean(c_h[:, :, self.config.index[4], :], 2, keepdim=True).expand_as(c_h)
         c_g_s_right_arm = torch.mean(c_h[:, :, self.config.index[3], :], 2, keepdim=True).expand_as(c_h)
         c_g_s_left_leg = torch.mean(c_h[:, :, self.config.index[1], :], 2, keepdim=True).expand_as(c_h)
         c_g_s_right_leg = torch.mean(c_h[:, :, self.config.index[0], :], 2, keepdim=True).expand_as(c_h)
 
 
         for rec in range(self.config.encoder_recurrent_steps):
-            hidden_states, cell_states, global_t_state, g_t, c_g_t, g_t1, g_t2, g_t3, c_g_t1, c_g_t2, c_g_t3, g_s, c_g_s, \
-            g_s_spine, c_g_s_spine, g_s_left_arm, c_g_s_left_arm, g_s_right_arm, c_g_s_right_arm, \
-            g_s_left_leg, c_g_s_left_leg, g_s_right_leg, c_g_s_right_leg \
-                = self.encoder_cell[rec](h, c_h, p, g_t, c_g_t, g_t1, g_t2, g_t3, c_g_t1, c_g_t2, c_g_t3,
-                                         g_s, c_g_s, g_s_spine, c_g_s_spine, g_s_left_arm, c_g_s_left_arm,
-                                         g_s_right_arm, c_g_s_right_arm, \
-                                         g_s_left_leg, c_g_s_left_leg, g_s_right_leg, c_g_s_right_leg, train)
-        prediction = self.decoder(hidden_states, cell_states, global_t_state, decoder_inputs)
+            hidden_states, cell_states, global_t_state, global_s_state \
+            = self.encoder_cell[rec](h, c_h, encoder_inputs, g_t, c_g_t, g_t1, g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3,
+                                         g_s, c_g_s,g_s_spine, c_g_s_spine, g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm,
+                                         g_s_left_leg, c_g_s_left_leg,g_s_right_leg,c_g_s_right_leg,train)
+        prediction = self.decoder(hidden_states, cell_states, global_t_state, global_s_state, decoder_inputs)
 
         return prediction
 
@@ -129,7 +123,7 @@ class EncoderCell(nn.Module):
         """h update gates"""
         # input  gate
         #self.Ui = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ui = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ui = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wti = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsi = torch.nn.Parameter(torch.randn((self.config.input_window_size - 1), self.config.hidden_size * 3, self.config.hidden_size))
         self.Zti = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -146,7 +140,7 @@ class EncoderCell(nn.Module):
 
         # left time forget gate
         #self.Ult = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ult = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ult = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtlt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wslt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztlt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -171,7 +165,7 @@ class EncoderCell(nn.Module):
 
         # forward time forget gate
         #self.Uft = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Uft = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Uft = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtft = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsft = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztft = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -195,7 +189,7 @@ class EncoderCell(nn.Module):
         self.bft = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, 1, self.config.hidden_size))
 
         # right time forget gate
-        self.Urt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Urt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         #self.Urt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
         self.Wtrt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsrt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
@@ -221,7 +215,7 @@ class EncoderCell(nn.Module):
 
         # space forget gate
         #self.Us = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Us = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Us = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wts = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wss = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Zts = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -247,7 +241,7 @@ class EncoderCell(nn.Module):
         # left space forget gate
         # self.Us = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
         self.Uls = torch.nn.Parameter(
-            torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+            torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtls = torch.nn.Parameter(
             torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsls = torch.nn.Parameter(
@@ -277,7 +271,7 @@ class EncoderCell(nn.Module):
         # right space forget gate
         # self.Us = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
         self.Urs = torch.nn.Parameter(
-            torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+            torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtrs = torch.nn.Parameter(
             torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsrs = torch.nn.Parameter(
@@ -306,7 +300,7 @@ class EncoderCell(nn.Module):
 
         # global time forgate gate
         #self.Ugt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ugt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ugt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztgt = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -332,7 +326,7 @@ class EncoderCell(nn.Module):
 
         # global time forgate gate for scale 1
         self.Ugt1 = torch.nn.Parameter(
-            torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+            torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgt1 = torch.nn.Parameter(
             torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgt1 = torch.nn.Parameter(
@@ -361,7 +355,7 @@ class EncoderCell(nn.Module):
 
         # global time forgate gate for scale 2
         self.Ugt2 = torch.nn.Parameter(
-            torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+            torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgt2 = torch.nn.Parameter(
             torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgt2 = torch.nn.Parameter(
@@ -390,7 +384,7 @@ class EncoderCell(nn.Module):
 
         # global time forgate gate for scale 3
         self.Ugt3 = torch.nn.Parameter(
-            torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+            torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgt3 = torch.nn.Parameter(
             torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgt3 = torch.nn.Parameter(
@@ -420,7 +414,7 @@ class EncoderCell(nn.Module):
 
         # global space forgate gate
         #self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztgs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -445,7 +439,7 @@ class EncoderCell(nn.Module):
 
         # global space forgate gate for spine
         #self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ugss = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ugss = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgss = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgss = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztgss = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -470,7 +464,7 @@ class EncoderCell(nn.Module):
 
         # global space forgate gate for left arm
         #self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ugsla = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ugsla = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgsla = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgsla = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztgsla = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -495,7 +489,7 @@ class EncoderCell(nn.Module):
 
         # global space forgate gate for right arm
         #self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ugsra = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ugsra = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgsra = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgsra = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztgsra = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -520,7 +514,7 @@ class EncoderCell(nn.Module):
 
         # global space forgate gate for left leg
         #self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ugsll = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ugsll = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgsll = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgsll = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztgsll = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -545,7 +539,7 @@ class EncoderCell(nn.Module):
 
         # global space forgate gate for right leg
         #self.Ugs = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Ugsrl = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Ugsrl = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtgsrl = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsgsrl = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztgsrl = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -571,7 +565,7 @@ class EncoderCell(nn.Module):
 
         # output gate
         #self.Uo = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Uo = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Uo = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wto = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wso = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Zto = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -596,7 +590,7 @@ class EncoderCell(nn.Module):
 
         # c_hat gate
         #self.Uc = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
-        self.Uc = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.bone_dim, self.config.hidden_size))
+        self.Uc = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.input_size, self.config.hidden_size))
         self.Wtc = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Wsc = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size * 3, self.config.hidden_size))
         self.Ztc = torch.nn.Parameter(torch.randn(self.config.input_window_size - 1, self.config.hidden_size, self.config.hidden_size))
@@ -823,13 +817,13 @@ class EncoderCell(nn.Module):
                 ,g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm,g_s_left_leg,c_g_s_left_leg
                 ,g_s_right_leg,c_g_s_right_leg,train):
         """
-        :param h: hidden states of [batch, input_window_size-1, nbones, hidden_size]
-        :param c_h: cell states of  [batch, input_window_size-1, nbones, hidden_size]
-        :param p: pose of  [batch, input_window_size-1, nbones, hidden_size]
-        :param g_t: [batch, input_window_size-1, nbones, hidden_size]
-        :param c_g_t: [batch, input_window_size-1, nbones, hidden_size]
-        :param g_s: [batch, input_window_size-1, nbones, hidden_size]
-        :param c_g_s: [batch, input_window_size-1, nbones, hidden_size]
+        :param h: hidden states of [batch, input_window_size-1, input_size, hidden_size]
+        :param c_h: cell states of  [batch, input_window_size-1, input_size, hidden_size]
+        :param p: pose of  [batch, input_window_size-1, input_size]
+        :param g_t: [batch, input_window_size-1, input_size, hidden_size]
+        :param c_g_t: [batch, input_window_size-1, input_size, hidden_size]
+        :param g_s: [batch, input_window_size-1, input_size, hidden_size]
+        :param c_g_s: [batch, input_window_size-1, input_size, hidden_size]
         :param train: control dropout
         :return: hidden_states, cell_states, global_t_state, g_t, c_g_t, g_s, c_g_s
         hidden_states, cell_states, global_t_state at last encoding recurrent will be used in decoder.
@@ -843,12 +837,12 @@ class EncoderCell(nn.Module):
 
         h_t_before = torch.cat((padding_t, h[:, :-1, :, :]), dim=1)
         h_t_after = torch.cat((h[:, 1:, :, :], padding_t), dim=1)
-        # [batch, input_window_size-1, nbones, hidden_size*3]
+        # [batch, input_window_size-1, input_size, hidden_size*3]
         h_t_before_after = torch.cat((h_t_before, h, h_t_after), dim=3) ##将隐藏向量连起来
 
         c_t_before = torch.cat((padding_t, c_h[:, :-1, :, :]), dim=1)
         c_t_after = torch.cat((c_h[:, 1:, :, :], padding_t), dim=1)
-        # [batch, input_window_size-1, nbones, hidden_size*3]
+        # [batch, input_window_size-1, input_size, hidden_size*3]
 
         h_s_before = torch.cat((padding_s, h[:, :, :-1, :]), dim=2)
         c_s_before = torch.cat((padding_s, c_h[:, :, :-1, :]), dim=2)
@@ -858,6 +852,22 @@ class EncoderCell(nn.Module):
         h_s_before_after = torch.cat((h_s_before, h, h_s_after), dim=3)
 
         # forget gates for h
+        # _1 = torch.matmul(p, self.Ui)
+        # _2 = torch.matmul(h_t_before_after, self.Wti)
+        # _3 = torch.matmul(h_s_before_after, self.Wsi)
+        # _4 = torch.matmul(g_t, self.Zti)
+        # _5 = torch.matmul(g_s, self.Zsi)
+        # _6 = torch.matmul(g_t1, self.Zt1i)
+        # _7 = torch.matmul(g_t2, self.Zt2i)
+        # _8 = torch.matmul(g_t3, self.Zt3i)
+        # _9 = torch.matmul(g_s_spine, self.Zssi)
+        # _10 = torch.matmul(g_s_left_arm, self.Zslai)
+        # _11 = torch.matmul(g_s_right_arm, self.Zsrai)
+        # _12 = torch.matmul(g_s_left_leg, self.Zslli)
+        # _13 = torch.matmul(g_s_right_leg, self.Zsrli)
+        # _14 = self.bi
+
+
         i_n = torch.sigmoid(torch.matmul(p, self.Ui) + torch.matmul(h_t_before_after, self.Wti)
                             + torch.matmul(h_s_before_after, self.Wsi) + torch.matmul(g_t, self.Zti)
                             + torch.matmul(g_s, self.Zsi) + torch.matmul(g_t1, self.Zt1i)
@@ -1013,12 +1023,6 @@ class EncoderCell(nn.Module):
                                                                                      self.Zsllc)
                             + torch.matmul(g_s_right_leg, self.Zsrlc) + self.bc)
 
-
-        # 细胞状态
-        # 增加 f_gt1_n, f_gt2_n, f_gt3_n, f_gss_n, f_gsla_n, f_gsra_n, f_gsll_n, f_gsrl_n
-        # 对应 c_g_t1, c_g_t2,c_g_t3， c_g_s_spine, c_g_s_left_arm, c_g_s_right_arm,c_g_s_left_leg,c_g_s_right_leg
-        # c_h = (f_lt_n * c_t_before) + (f_ft_n * c_h) + (f_rt_n * c_t_after) + (f_s_n * c_s_before)\
-        #                 + (f_gt_n * c_g_t) + (f_gs_n * c_g_s) + (c_n * i_n)
         c_h = (f_lt_n * c_t_before) + (f_ft_n * c_h) + (f_rt_n * c_t_after) + (f_s_n * c_h)\
                         + (f_ls_n * c_s_before) + (f_rs_n * c_s_after) \
                         + (f_gt_n * c_g_t) + (f_gs_n * c_g_s) + (c_n * i_n)\
@@ -1041,7 +1045,7 @@ class EncoderCell(nn.Module):
 
 
         """Update g_t1"""
-        # h: hidden states of [batch, input_window_size-1, nbones, hidden_size]
+        # h: hidden states of [batch, input_window_size-1, input_size, hidden_size]
         # gt1: (self.config.input_window_size - 1)//3
         g_t1_hat = torch.mean(h[:, :(self.config.input_window_size - 1)//3, :, :], 1, keepdim=True).expand_as(h)
         f_gt1f_n = torch.sigmoid(torch.matmul(g_t1, self.Wgt1f) + torch.matmul(g_t1_hat, self.Zgt1f) + self.bgt1f)
@@ -1093,6 +1097,11 @@ class EncoderCell(nn.Module):
         g_s_spine = o_gss_n * torch.tanh(c_g_s_spine)
 
         # # 结果是[batch, input_window_size-1, hidden_size]，在空间维（骨骼）求了平均
+        # g_s_spine = torch.mean(h[:, 6:10, :, :], 1, keepdim = True).expand_as(h[:, 6:10, :, :])
+        # g_s_left_arm = torch.mean(h[:, 10:14, :, :], 1, keepdim = True).expand_as(h[:, 10:14, :, :])
+        # g_s_right_arm = torch.mean(h[:, 14:, :, :], 1, keepdim=True).expand_as(h[:, 14:, :, :])
+        # g_s_left_leg = torch.mean(h[:, 3:6, :, :], 1, keepdim=True).expand_as(h[:, 3:6, :, :])
+        # g_s_right_leg = torch.mean(h[:, :3, :, :], 1, keepdim=True).expand_as(h[:, :3, :, :])
         """Update g_s_left_arm"""
         g_sla_hat = torch.mean(h[:, :, self.config.index[4], :], 2, keepdim=True).expand_as(h)
         f_gslaf_n = torch.sigmoid(torch.matmul(g_s_left_arm, self.Wgslaf) + torch.matmul(g_sla_hat, self.Zgslaf) + self.bgslaf)
@@ -1133,8 +1142,9 @@ class EncoderCell(nn.Module):
         hidden_states = h.view([h.shape[0], h.shape[1], -1])
         cell_states = c_h.view([c_h.shape[0], c_h.shape[1], -1])
         global_t_state = g_t[:, 1, :, :].view([g_t.shape[0], -1])
-        # global_s_state = g_s[:, :, 1, :].reshape([g_s.shape[0], -1])
-        return hidden_states, cell_states, global_t_state, g_t, c_g_t, g_t1, g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3,g_s, c_g_s,g_s_spine, c_g_s_spine,g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm,g_s_left_leg,c_g_s_left_leg,g_s_right_leg,c_g_s_right_leg
+        global_s_state = g_s[:, :, 1, :].view([g_s.shape[0], -1])
+        return hidden_states, cell_states, global_t_state, global_s_state
+
 
 class Kinematics_LSTM_decoder(nn.Module):
 
@@ -1149,32 +1159,33 @@ class Kinematics_LSTM_decoder(nn.Module):
         self.nbones = config.nbones
         self.lstm = nn.ModuleList()
         self.para_list = torch.nn.ParameterList()
-        if config.dataset == 'Human' or config.dataset == 'AMASS':
+        if config.dataset == 'Human':
             co = 5
         for i in range(co):
-            self.para_list.append(torch.nn.Parameter(torch.empty(int(config.input_size/config.bone_dim*config.hidden_size), config.training_chain_length[i]).uniform_(-0.04, 0.04)))
+            self.para_list.append(torch.nn.Parameter(torch.empty(int(config.input_size*config.hidden_size), config.training_chain_length[i]).uniform_(-0.04, 0.04)))
             self.para_list.append(torch.nn.Parameter(torch.empty(config.training_chain_length[i]).uniform_(-0.04, 0.04)))
         # LSTM First layer
-        self.lstm.append(nn.LSTMCell(config.input_size, int(config.input_size / config.bone_dim * config.hidden_size)))
+        self.lstm.append(nn.LSTMCell(config.input_size, int(config.input_size * config.hidden_size)))
         # Kinematics LSTM layer
-        spine = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+        spine = nn.LSTMCell(int(config.input_size * config.hidden_size), int(config.input_size * config.hidden_size))
         self.lstm.append(spine)
-        arm = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+        arm = nn.LSTMCell(int(config.input_size  * config.hidden_size), int(config.input_size * config.hidden_size))
         self.lstm.append(arm)
         self.lstm.append(arm)
         if config.dataset == 'Human' or config.dataset == 'AMASS':
-            leg = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+            leg = nn.LSTMCell(int(config.input_size  * config.hidden_size), int(config.input_size * config.hidden_size))
             self.lstm.append(leg)
             self.lstm.append(leg)
             self.lstm_layer = 6
 
-    def forward(self, hidden_states, cell_states, global_t_state, p):
+    def forward(self, hidden_states, cell_states, global_t_state, global_s_state, p):
         """
         decoder forward
-        :param hidden_states: hideen states [batch, input_window_size-1, nbones * hidden_size]
-        :param cell_states: hideen states [batch, input_window_size-1, nbones * hidden_size]
-        :param global_t_state: [batch, nbones * hidden_size]
-        :param p: [batch, 1, nbones * hidden_size] 1 remains the dimension of hidden states
+        :param hidden_states: hideen states [batch, input_window_size-1, input_size * hidden_size]
+        :param cell_states: hideen states [batch, input_window_size-1, input_size * hidden_size]
+        :param global_t_state: [batch, input_size * hidden_size]
+        :param global_s_state: [batch, n_frames * hidden_size]
+        :param p: [batch, 1, input_size ] 1 remains the dimension of hidden states
         :return: predictions of human motion
         """
 
@@ -1197,7 +1208,6 @@ class Kinematics_LSTM_decoder(nn.Module):
 
         for frame in range(self.seq_length_out):
             for i in range(self.lstm_layer):
-                # 0 全局层；1 脊柱层； 2 3 左右手臂层； 4 5 左右腿部层
                 cell = self.lstm[i]
                 if i == 0:
                     if frame == 0:
@@ -1213,7 +1223,7 @@ class Kinematics_LSTM_decoder(nn.Module):
                         input = h[i-1][:, frame + 1, :].clone()
                 h[i][:, frame + 1, :], c_h[i][:, frame + 1, :] \
                     = cell(input, (h[i][:, frame, :].clone(), c_h[i][:, frame, :].clone()))
-                if self.config.dataset == 'Human' or 'AMASS':
+                if self.config.dataset == 'Human' or self.config.dataset == 'AMASS':
                     order = [2, 0, 1, 3, 4]
 
                 if i != 0:
@@ -1229,7 +1239,6 @@ class LSTM_decoder(nn.Module):
         super().__init__()
         self.config = config
         self.seq_length_out = config.output_window_size
-        self.nbones = config.nbones
         self.lstm = nn.ModuleList()
         self.weights_out = torch.nn.Parameter(torch.empty(int(config.input_size/config.bone_dim*config.hidden_size), config.input_size).uniform_(-0.04, 0.04))
         self.bias_out = torch.nn.Parameter(torch.empty(config.input_size).uniform_(-0.04, 0.04))

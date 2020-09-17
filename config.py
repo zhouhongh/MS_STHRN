@@ -20,13 +20,13 @@ import numpy as np
 
 class TrainConfig(object):
     """Training Configurations"""
-    input_window_size = 10  # Input window size during training
-    output_window_size = 50  # Output window size during training
+    input_window_size = 50  # Input window size during training
+    output_window_size = 10  # Output window size during training
     hidden_size = 18  # Number of hidden units for HMR
     batch_size = 50  # Batch size for training
     learning_rate = 0.001  # Learning rate
-    max_epoch = 200 #200  # Maximum training epochs 本来是500
-    training_size = 100 # 200  # Training iterations per epoch
+    max_epoch = 100 #200  # Maximum training epochs 本来是500
+    training_size = 200 # 200  # Training iterations per epoch
     validation_size = 20  # Validation iterations per epoch
     restore = False  # Restore the trained weights or restart training from scratch
     longterm = False  # Whether we are doing super longterm prediction
@@ -38,7 +38,7 @@ class TrainConfig(object):
 
     # choose model
     models_name = ['HMR', 'ST_HRN', 'MS_STHRN']
-    model = models_name[1]
+    model = models_name[2]
 
     # choose loss
     loss_name = ['l2', 'weightlie', 'HMRlie']
@@ -93,11 +93,11 @@ class TrainConfig(object):
             self.training_chain_length = [8, 8, 18, 10, 10]
 
             # H3.6M
-            self.index = [[6, 7, 8, 9, 10, 11, 12, 13],
-                          [14, 15, 16, 17, 18, 19, 20, 21],
-                          [0, 1, 2, 3, 4, 5, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-                          [34, 35, 36, 37, 38, 39, 40, 41, 42, 43],
-                          [44, 45, 46, 47, 48, 49, 50, 51, 52, 53]]
+            self.index = [[6, 7, 8, 9, 10, 11, 12, 13], # right leg 0
+                          [14, 15, 16, 17, 18, 19, 20, 21], # left leg 1
+                          [0, 1, 2, 3, 4, 5, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33], # spine 2
+                          [34, 35, 36, 37, 38, 39, 40, 41, 42, 43], # right arm 3
+                          [44, 45, 46, 47, 48, 49, 50, 51, 52, 53]] # left arm 4
 
             # 共32行，非零行26
             self.bone_length = np.array([[0., 0., 0.],  #全局方向
@@ -167,8 +167,9 @@ class TrainConfig(object):
                           [36, 37, 38, 45, 46, 47, 51, 52, 53, 57, 58, 59]]  # arm
 
 
-            # AMASS的骨骼长度计算smpl中性人关节坐标得到，# 共21行，非零行19(左右脚趾是零）
-            self.bone_length = np.array([[122.1, 0., 0.],  # 1
+            # AMASS的骨骼长度计算smpl中性人关节坐标得到，# 共22行，非零行19(全局方向，左右脚趾是零）
+            self.bone_length = np.array([[0., 0., 0.],  # 0
+                             [122.1, 0., 0.],  # 1
                              [120., 0., 0.],  # 2
                              [121.9, 0., 0.],  # 3
                              [380.8, 0., 0.], # 4
