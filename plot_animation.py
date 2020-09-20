@@ -9,6 +9,7 @@ import os
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def plot_animation(predict, labels, config, filename):
@@ -96,6 +97,8 @@ class plot_h36m(object):
         ani = FuncAnimation(self.fig, self.update, frames=self.nframes, interval=100, repeat=False)
         plt.title(self.filename, fontsize=16)
         ani.save(self.folder_dir + self.filename + '.gif', writer='pillow')
+
+        plt.close()
         # plt.show()
 
 class plot_amass(object):

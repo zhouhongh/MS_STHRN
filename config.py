@@ -20,8 +20,8 @@ import numpy as np
 
 class TrainConfig(object):
     """Training Configurations"""
-    input_window_size = 50  # Input window size during training
-    output_window_size = 10  # Output window size during training
+    input_window_size = 10  # Input window size during training
+    output_window_size = 50  # Output window size during training
     hidden_size = 18  # Number of hidden units for HMR
     batch_size = 50  # Batch size for training
     learning_rate = 0.001  # Learning rate

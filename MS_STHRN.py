@@ -90,14 +90,14 @@ class MS_STHRN(nn.Module):
         g_s = torch.mean(h, 2, keepdim=True).expand_as(h)
         c_g_s = torch.mean(c_h, 2, keepdim=True).expand_as(c_h)
 
-        g_s_spine = torch.mean(h[:, :, self.config.index[2], :], 2, keepdim = True).expand_as(h)
-        g_s_left_arm = torch.mean(h[:, :, self.config.index[4], :], 2, keepdim = True).expand_as(h)
+        g_s_spine = torch.mean(h[:, :, self.config.index[2], :], 2, keepdim=True).expand_as(h)
+        g_s_left_arm = torch.mean(h[:, :, self.config.index[4], :], 2, keepdim=True).expand_as(h)
         g_s_right_arm = torch.mean(h[:, :, self.config.index[3], :], 2, keepdim=True).expand_as(h)
         g_s_left_leg = torch.mean(h[:, :, self.config.index[1], :], 2, keepdim=True).expand_as(h)
         g_s_right_leg = torch.mean(h[:, :, self.config.index[0], :], 2, keepdim=True).expand_as(h)
 
-        c_g_s_spine = torch.mean(c_h[:, :, self.config.index[2], :], 2, keepdim = True).expand_as(c_h)
-        c_g_s_left_arm = torch.mean(c_h[:, :, self.config.index[4], :], 2, keepdim = True).expand_as(c_h)
+        c_g_s_spine = torch.mean(c_h[:, :, self.config.index[2], :], 2, keepdim=True).expand_as(c_h)
+        c_g_s_left_arm = torch.mean(c_h[:, :, self.config.index[4], :], 2, keepdim=True).expand_as(c_h)
         c_g_s_right_arm = torch.mean(c_h[:, :, self.config.index[3], :], 2, keepdim=True).expand_as(c_h)
         c_g_s_left_leg = torch.mean(c_h[:, :, self.config.index[1], :], 2, keepdim=True).expand_as(c_h)
         c_g_s_right_leg = torch.mean(c_h[:, :, self.config.index[0], :], 2, keepdim=True).expand_as(c_h)
@@ -857,7 +857,7 @@ class EncoderCell(nn.Module):
         c_s_after = torch.cat((c_h[:, :, 1:, :], padding_s), dim=2)
         h_s_before_after = torch.cat((h_s_before, h, h_s_after), dim=3)
 
-        # forget gates for h
+        # 输入门
         i_n = torch.sigmoid(torch.matmul(p, self.Ui) + torch.matmul(h_t_before_after, self.Wti)
                             + torch.matmul(h_s_before_after, self.Wsi) + torch.matmul(g_t, self.Zti)
                             + torch.matmul(g_s, self.Zsi) + torch.matmul(g_t1, self.Zt1i)
@@ -1217,6 +1217,10 @@ class Kinematics_LSTM_decoder(nn.Module):
                     order = [2, 0, 1, 3, 4]
 
                 if i != 0:
+                    # _1 = h[i][:, frame + 1, :].clone()
+                    # _2 = self.para_list[order[i - 1] * 2]
+                    # _3 = self.para_list[order[i - 1] * 2 + 1]
+                    # _4 = input_first[:, self.config.index[order[i-1]]]
                     pre[:, frame, self.config.index[order[i-1]]] = torch.matmul(h[i][:, frame + 1, :].clone(),
                                                                     self.para_list[order[i-1]*2]) + self.para_list[order[i-1]*2+1] + input_first[:, self.config.index[order[i-1]]]
 
@@ -1405,4 +1409,95 @@ class ST_LSTMCell(nn.Module):
         h = o_n * torch.tanh(c_h)
 
         return h, c_h
+
+
+class MSST_LSTM_decoder(nn.Module):
+
+    def __init__(self, config):
+        """
+        This decoder only apply to h3.6m dataset.
+        :param config: global config class
+        """
+        super().__init__()
+        self.config = config
+        self.seq_length_out = config.output_window_size
+        self.nbones = config.nbones
+        self.lstm = nn.ModuleList()
+        self.para_list = torch.nn.ParameterList()
+        if config.dataset == 'Human' or config.dataset == 'AMASS':
+            co = 5
+        for i in range(co):
+            self.para_list.append(torch.nn.Parameter(torch.empty(int(config.input_size/config.bone_dim*config.hidden_size), config.training_chain_length[i]).uniform_(-0.04, 0.04)))
+            self.para_list.append(torch.nn.Parameter(torch.empty(config.training_chain_length[i]).uniform_(-0.04, 0.04)))
+        # LSTM First layer
+        self.lstm.append(nn.LSTMCell(config.input_size, int(config.input_size / config.bone_dim * config.hidden_size)))
+        # Kinematics LSTM layer
+        spine = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+        self.lstm.append(spine)
+        arm = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+        self.lstm.append(arm)
+        self.lstm.append(arm)
+        if config.dataset == 'Human' or config.dataset == 'AMASS':
+            leg = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+            self.lstm.append(leg)
+            self.lstm.append(leg)
+            self.lstm_layer = 6
+
+    def forward(self, hidden_states, cell_states, global_t_state, global_s_state, p):
+        """
+        decoder forward
+        :param hidden_states: hideen states [batch, input_window_size-1, nbones * hidden_size]
+        :param cell_states: hideen states [batch, input_window_size-1, nbones * hidden_size]
+        :param global_t_state: [batch, nbones * hidden_size]
+        :param p: [batch, 1, nbones * hidden_size] 1 remains the dimension of hidden states
+        :return: predictions of human motion
+        """
+
+        # define decoder hidden states and cell states
+        h = []
+        c_h = []
+        pre = torch.zeros([hidden_states.shape[0], self.seq_length_out, self.config.input_size], device=p.device)
+        for i in range(self.lstm_layer):
+            h.append(torch.zeros(hidden_states.shape[0], self.seq_length_out + 1, self.config.input_size * self.config.hidden_size,
+                              device=p.device))
+            c_h.append(torch.zeros_like(h[i]))
+            # feed init hidden states and cell states into h and c_h
+            if i == 0:
+                h_t = torch.cat((global_t_state.unsqueeze(1), hidden_states), dim=1)
+            elif i == 1:
+                h_t = torch.cat((global_t_state.unsqueeze(1), hidden_states), dim=1)
+            if i < 2:
+                h[i][:, 0, :] = h_t.mean(dim=1)
+                c_h[i][:, 0, :] = torch.mean(cell_states, dim=1)
+
+        for frame in range(self.seq_length_out):
+            for i in range(self.lstm_layer):
+                # 0 全局层；1 脊柱层； 2 3 左右手臂层； 4 5 左右腿部层
+                cell = self.lstm[i]
+                if i == 0:
+                    if frame == 0:
+                        input = p[:, 0, :]
+                        input_first = p[:, 0, :]
+                    else:
+                        input = pre[:, frame - 1, :].clone()
+                        input_first = pre[:, frame - 1, :].clone()
+                else:
+                    if i == (3 or 4 or 5):
+                        input = h[1][:, frame + 1, :].clone()
+                    else:
+                        input = h[i-1][:, frame + 1, :].clone()
+                h[i][:, frame + 1, :], c_h[i][:, frame + 1, :] \
+                    = cell(input, (h[i][:, frame, :].clone(), c_h[i][:, frame, :].clone()))
+                if self.config.dataset == 'Human' or 'AMASS':
+                    order = [2, 0, 1, 3, 4]
+
+                if i != 0:
+                    # _1 = h[i][:, frame + 1, :].clone()
+                    # _2 = self.para_list[order[i - 1] * 2]
+                    # _3 = self.para_list[order[i - 1] * 2 + 1]
+                    # _4 = input_first[:, self.config.index[order[i-1]]]
+                    pre[:, frame, self.config.index[order[i-1]]] = torch.matmul(h[i][:, frame + 1, :].clone(),
+                                                                    self.para_list[order[i-1]*2]) + self.para_list[order[i-1]*2+1] + input_first[:, self.config.index[order[i-1]]]
+
+        return pre
 
