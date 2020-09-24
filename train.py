@@ -15,8 +15,10 @@ import scipy.io as sio
 from plot_animation import plot_animation
 import config
 from argparse import ArgumentParser
-# python train.py --dataset Human --action all
-os.environ["CUDA_VISIBLE_DEVICES"]='1'
+from torchviz import make_dot
+from tensorboardX import SummaryWriter
+# python train.py --dataset Human --action walking
+# os.environ["CUDA_VISIBLE_DEVICES"]='1'
 def choose_net(config):
 
     if config.model == 'ST_HRN':
@@ -26,6 +28,10 @@ def choose_net(config):
     elif config.model == 'MS_STHRN':
         net = MS_STHRN(config)
     return net
+
+
+
+
 
 def train(config, checkpoint_dir):
     print('Start Training the Model!')
@@ -95,6 +101,9 @@ def train(config, checkpoint_dir):
                 loss = Loss(prediction, decoder_outputs, bone_length, config)
                 net.zero_grad()
                 loss.backward()
+                # g = make_dot(loss)
+                # g.render('MSSTHRN_model', view=False)
+                # [print(x.grad) for x in optimizer.param_groups[0]['params']]
                 _ = torch.nn.utils.clip_grad_norm_(net.parameters(), 5)
                 optimizer.step()
 
@@ -254,7 +263,7 @@ def prediction(config, checkpoint_dir, output_dir):
 if __name__ == '__main__':
 
     parser = ArgumentParser()
-    parser.add_argument("--gpu", default=[2], help="GPU device ids")
+    parser.add_argument("--gpu", default=[1], help="GPU device ids")
     parser.add_argument("--training", default=True, dest="training", help="train or test")
     parser.add_argument("--action", type=str, default='all', dest="action", help="choose one action in the dataset:"
                                                                                  "h3.6m_actions = ['directions', 'discussion', 'eating', 'greeting', 'phoning', 'posing', 'purchases', 'sitting',"

@@ -54,14 +54,15 @@ def HMRlie_loss(prediction, y, bone, config):
 
 def weightlie_loss(prediction, y, bone, config):
     """
-    weightlielie loss
+    weightlie loss
     :param prediction:
     :param y:
     :param bone:
     :param config:
     :return:
     """
-
+    # TODO
+    # 改为五个动作链对应的loss
     chainlength = bone.shape[0]
     weights = torch.zeros(chainlength * 3, device=prediction.device)
     for j in range(chainlength):

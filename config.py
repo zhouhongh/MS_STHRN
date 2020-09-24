@@ -24,7 +24,7 @@ class TrainConfig(object):
     output_window_size = 50  # Output window size during training
     hidden_size = 18  # Number of hidden units for HMR
     batch_size = 50  # Batch size for training
-    learning_rate = 0.001  # Learning rate
+    learning_rate = 0.0001  # Learning rate 0.001
     max_epoch = 100 #200  # Maximum training epochs 本来是500
     training_size = 200 # 200  # Training iterations per epoch
     validation_size = 20  # Validation iterations per epoch
@@ -47,8 +47,8 @@ class TrainConfig(object):
     """suitable for ST_HRN && MS_STHRN"""
     share_encoder_weights = True  # share encoder weight at each recurrent step, this param only applies to ST_HRN
     bone_dim = 3  # dimension of one bone representation, static in all datasets
-    decoder_name = ['lstm', 'Kinematics_lstm']
-    decoder = decoder_name[1]
+    decoder_name = ['lstm', 'Kinematics_lstm', 'MSST_lstm']
+    decoder = decoder_name[2]
 
     """only suitable for MS_STHRN"""
     data_root = '/mnt/DataDrive164/zhouhonghong/AMASS_selected'

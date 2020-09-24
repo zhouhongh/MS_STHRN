@@ -37,6 +37,9 @@ class MS_STHRN(nn.Module):
         elif config.decoder == 'Kinematics_lstm':
             print('Use Kinematics_LSTM as decoder.')
             self.decoder = Kinematics_LSTM_decoder(config)
+        elif config.decoder == 'MSST_lstm':
+            print('Use MSST_LSTM as decoder.')
+            self.decoder = MSST_LSTM_decoder(config)
 
         self.weights_in = torch.nn.Parameter(torch.empty(config.input_size,
                                       int(config.input_size/config.bone_dim*config.hidden_size)).uniform_(-0.04, 0.04)) ##[54,324]
@@ -111,7 +114,12 @@ class MS_STHRN(nn.Module):
                                          g_s, c_g_s, g_s_spine, c_g_s_spine, g_s_left_arm, c_g_s_left_arm,
                                          g_s_right_arm, c_g_s_right_arm, \
                                          g_s_left_leg, c_g_s_left_leg, g_s_right_leg, c_g_s_right_leg, train)
-        prediction = self.decoder(hidden_states, cell_states, global_t_state, decoder_inputs)
+
+        if self.config.decoder == 'MSST_lstm':
+            prediction = self.decoder(hidden_states, cell_states, global_t_state, g_s, c_g_s, g_s_spine, g_s_right_arm, g_s_left_arm, g_s_right_leg, g_s_left_leg, decoder_inputs)
+            # def forward(self, hidden_states, cell_states, global_t_state, gs, c_gs, gs_spine, gs_right_arm, gs_left_arm, gs_right_leg, gs_left_leg, p):
+        else:
+            prediction = self.decoder(hidden_states, cell_states, global_t_state, decoder_inputs)
 
         return prediction
 
@@ -1133,7 +1141,6 @@ class EncoderCell(nn.Module):
         hidden_states = h.view([h.shape[0], h.shape[1], -1])
         cell_states = c_h.view([c_h.shape[0], c_h.shape[1], -1])
         global_t_state = g_t[:, 1, :, :].view([g_t.shape[0], -1])
-        # global_s_state = g_s[:, :, 1, :].reshape([g_s.shape[0], -1])
         return hidden_states, cell_states, global_t_state, g_t, c_g_t, g_t1, g_t2, g_t3,c_g_t1, c_g_t2,c_g_t3,g_s, c_g_s,g_s_spine, c_g_s_spine,g_s_left_arm,c_g_s_left_arm, g_s_right_arm,c_g_s_right_arm,g_s_left_leg,c_g_s_left_leg,g_s_right_leg,c_g_s_right_leg
 
 class Kinematics_LSTM_decoder(nn.Module):
@@ -1192,6 +1199,7 @@ class Kinematics_LSTM_decoder(nn.Module):
             elif i == 1:
                 h_t = torch.cat((global_t_state.unsqueeze(1), hidden_states), dim=1)
             if i < 2:
+                _1 = h_t.mean(dim=1)
                 h[i][:, 0, :] = h_t.mean(dim=1)
                 c_h[i][:, 0, :] = torch.mean(cell_states, dim=1)
 
@@ -1312,7 +1320,7 @@ class ST_LSTM(nn.Module):
             recurrent_cell_box.append(cells)
         self.recurrent_cell_box = recurrent_cell_box
 
-    def forward(self, hidden_states, cell_states, global_t_state, global_s_state, p):
+    def forward(self, hidden_states, cell_states, global_t_state, p):
         """
         :param hidden_states:  [batch, input_window_size-1, nbones, hidden_size]
         :param cell_states: [batch, input_window_size-1, nbones, hidden_size]
@@ -1429,21 +1437,20 @@ class MSST_LSTM_decoder(nn.Module):
         for i in range(co):
             self.para_list.append(torch.nn.Parameter(torch.empty(int(config.input_size/config.bone_dim*config.hidden_size), config.training_chain_length[i]).uniform_(-0.04, 0.04)))
             self.para_list.append(torch.nn.Parameter(torch.empty(config.training_chain_length[i]).uniform_(-0.04, 0.04)))
-        # LSTM First layer
-        self.lstm.append(nn.LSTMCell(config.input_size, int(config.input_size / config.bone_dim * config.hidden_size)))
+        # First layer
+        self.lstm.append(MSST_LSTM_Cell(config.input_size, int(config.input_size / config.bone_dim * config.hidden_size)))
         # Kinematics LSTM layer
-        spine = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+        spine = MSST_LSTM_Cell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
         self.lstm.append(spine)
-        arm = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+        arm = MSST_LSTM_Cell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
         self.lstm.append(arm)
         self.lstm.append(arm)
-        if config.dataset == 'Human' or config.dataset == 'AMASS':
-            leg = nn.LSTMCell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
-            self.lstm.append(leg)
-            self.lstm.append(leg)
-            self.lstm_layer = 6
+        leg = MSST_LSTM_Cell(int(config.input_size / config.bone_dim * config.hidden_size), int(config.input_size / config.bone_dim * config.hidden_size))
+        self.lstm.append(leg)
+        self.lstm.append(leg)
+        self.lstm_layer = 6
 
-    def forward(self, hidden_states, cell_states, global_t_state, global_s_state, p):
+    def forward(self, hidden_states, cell_states, global_t_state, gs, c_gs, gs_spine, gs_right_arm, gs_left_arm, gs_right_leg, gs_left_leg, p):
         """
         decoder forward
         :param hidden_states: hideen states [batch, input_window_size-1, nbones * hidden_size]
@@ -1456,23 +1463,35 @@ class MSST_LSTM_decoder(nn.Module):
         # define decoder hidden states and cell states
         h = []
         c_h = []
+        g_s = []
+        c_g_s = []
         pre = torch.zeros([hidden_states.shape[0], self.seq_length_out, self.config.input_size], device=p.device)
         for i in range(self.lstm_layer):
             h.append(torch.zeros(hidden_states.shape[0], self.seq_length_out + 1, self.config.input_size * self.config.hidden_size,
                               device=p.device))
             c_h.append(torch.zeros_like(h[i]))
+            g_s.append(torch.zeros_like(h[i]))
+            c_g_s.append(torch.zeros_like(h[i]))
             # feed init hidden states and cell states into h and c_h
+            h_t = torch.cat((global_t_state.unsqueeze(1), hidden_states), dim=1)
             if i == 0:
-                h_t = torch.cat((global_t_state.unsqueeze(1), hidden_states), dim=1)
+                g_s[i][:, 0, :] = gs[:, -1, :, :].view([gs.shape[0], -1])
             elif i == 1:
-                h_t = torch.cat((global_t_state.unsqueeze(1), hidden_states), dim=1)
-            if i < 2:
-                h[i][:, 0, :] = h_t.mean(dim=1)
-                c_h[i][:, 0, :] = torch.mean(cell_states, dim=1)
+                g_s[i][:, 0, :] = gs_spine[:, -1, :, :].view([gs_spine.shape[0], -1])
+            elif i == 2:
+                g_s[i][:, 0, :] = gs_right_arm[:, -1, :, :].view([gs_right_arm.shape[0], -1])
+            elif i == 3:
+                g_s[i][:, 0, :] = gs_left_arm[:, -1, :, :].view([gs_left_arm.shape[0], -1])
+            elif i == 4:
+                g_s[i][:, 0, :] = gs_right_leg[:, -1, :, :].view([gs_right_leg.shape[0], -1])
+            else:
+                g_s[i][:, 0, :] = gs_left_leg[:, -1, :, :].view([gs_left_leg.shape[0], -1])
+            h[i][:, 0, :] = h_t.mean(dim=1)
+            c_h[i][:, 0, :] = torch.mean(cell_states, dim=1)
+            c_g_s[i][:, 0, :] = torch.mean(c_gs.view([c_gs.shape[0], c_gs.shape[1], -1]), dim=1)
 
         for frame in range(self.seq_length_out):
             for i in range(self.lstm_layer):
-                # 0 全局层；1 脊柱层； 2 3 左右手臂层； 4 5 左右腿部层
                 cell = self.lstm[i]
                 if i == 0:
                     if frame == 0:
@@ -1484,20 +1503,89 @@ class MSST_LSTM_decoder(nn.Module):
                 else:
                     if i == (3 or 4 or 5):
                         input = h[1][:, frame + 1, :].clone()
-                    else:
+                    else: # i==1,2
                         input = h[i-1][:, frame + 1, :].clone()
-                h[i][:, frame + 1, :], c_h[i][:, frame + 1, :] \
-                    = cell(input, (h[i][:, frame, :].clone(), c_h[i][:, frame, :].clone()))
+                h[i][:, frame + 1, :], c_h[i][:, frame + 1, :],  g_s[i][:, frame + 1, :], c_g_s[i][:, frame + 1, :] \
+                    = cell(input, h[i][:, frame, :].clone(), g_s[i][:, frame, :].clone(), c_h[i][:, frame, :].clone(), c_g_s[i][:, frame, :].clone())
                 if self.config.dataset == 'Human' or 'AMASS':
-                    order = [2, 0, 1, 3, 4]
+                    order = [2, 3, 4, 0, 1]
 
                 if i != 0:
-                    # _1 = h[i][:, frame + 1, :].clone()
-                    # _2 = self.para_list[order[i - 1] * 2]
-                    # _3 = self.para_list[order[i - 1] * 2 + 1]
-                    # _4 = input_first[:, self.config.index[order[i-1]]]
                     pre[:, frame, self.config.index[order[i-1]]] = torch.matmul(h[i][:, frame + 1, :].clone(),
                                                                     self.para_list[order[i-1]*2]) + self.para_list[order[i-1]*2+1] + input_first[:, self.config.index[order[i-1]]]
 
+
         return pre
 
+class MSST_LSTM_Cell(nn.Module):
+
+    def __init__(self, input_size, hidden_size):
+        super().__init__()
+
+        # input gate for h
+        self.Ui_h = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wti_h = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wsi_h = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bi_h = torch.nn.Parameter(torch.randn(hidden_size))
+        # input gate for h
+        self.Ui_g = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wti_g = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wsi_g = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bi_g = torch.nn.Parameter(torch.randn(hidden_size))
+        # space forget gate
+        self.Us = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wts = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wss = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bs = torch.nn.Parameter(torch.randn(hidden_size))
+        # time forget gate
+        self.Ut = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wtt = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wst = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bt = torch.nn.Parameter(torch.randn(hidden_size))
+        # output gate for h
+        self.Uo_h = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wto_h = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wso_h = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bo_h = torch.nn.Parameter(torch.randn(hidden_size))
+        # output gate for g
+        self.Uo_g = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wto_g = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wso_g = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bo_g = torch.nn.Parameter(torch.randn(hidden_size))
+        # c_hat gate for h
+        self.Uc_h = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wtc_h = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wsc_h = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bc_h = torch.nn.Parameter(torch.randn(hidden_size))
+        # c_hat gate for g
+        self.Uc_g = torch.nn.Parameter(torch.randn(input_size, hidden_size))
+        self.Wtc_g = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.Wsc_g = torch.nn.Parameter(torch.randn(hidden_size, hidden_size))
+        self.bc_g = torch.nn.Parameter(torch.randn(hidden_size))
+
+    def forward(self, x, h_t, g_s, c_t, c_s):
+        i_h = torch.sigmoid(
+            torch.matmul(x, self.Ui_h) + torch.matmul(h_t, self.Wti_h) + torch.matmul(g_s, self.Wsi_h) + self.bi_h)
+        i_g = torch.sigmoid(
+            torch.matmul(x, self.Ui_g) + torch.matmul(h_t, self.Wti_g) + torch.matmul(g_s, self.Wsi_g) + self.bi_g
+        )
+        f_s = torch.sigmoid(
+            torch.matmul(x, self.Us) + torch.matmul(h_t, self.Wts) + torch.matmul(g_s, self.Wss) + self.bs)
+        f_t = torch.sigmoid(
+            torch.matmul(x, self.Ut) + torch.matmul(h_t, self.Wtt) + torch.matmul(g_s, self.Wst) + self.bt)
+        o_h = torch.sigmoid(
+            torch.matmul(x, self.Uo_h) + torch.matmul(h_t, self.Wto_h) + torch.matmul(g_s, self.Wso_h) + self.bo_h)
+        o_g = torch.sigmoid(
+            torch.matmul(x, self.Uo_g) + torch.matmul(h_t, self.Wto_g) + torch.matmul(g_s, self.Wso_g) + self.bo_g)
+        c_h_hat = torch.tanh(
+            torch.matmul(x, self.Uc_h) + torch.matmul(h_t, self.Wtc_h) + torch.matmul(g_s, self.Wsc_h) + self.bc_h)
+        c_g_hat = torch.tanh(
+            torch.matmul(x, self.Uc_g) + torch.matmul(h_t, self.Wtc_g) + torch.matmul(g_s, self.Wsc_g) + self.bc_g)
+
+        c_h = (i_h * c_h_hat) + (f_t * c_t) + (f_s * c_s)
+        h = o_h * torch.tanh(c_h)
+        c_g = (i_g * c_g_hat) + (f_t * c_t) + (f_s * c_s)
+        g = o_g * torch.tanh(c_g)
+
+
+        return h, c_h, g, c_g
